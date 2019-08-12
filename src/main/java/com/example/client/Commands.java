@@ -32,15 +32,20 @@ public class Commands {
   @ShellMethod("Invoke Server API")
   public String invoke(@ShellOption(value = "--text", defaultValue = ShellOption.NULL) String text) throws Exception {
     log.info("Invoking API call with text = {}", text);
-    makeAPICAll();
+    JSONObject postBody = new JSONObject();
+    postBody.put("text", text);
+    int responseCode = makeAPICAll(postBody);
+    if(responseCode == 200) {
+      log.info("POST Success");
+    } else {
+      log.error("ERROR {}", responseCode);
+    }
     return text;
   }
 
-  private void makeAPICAll() throws Exception {
+  private SSLContext buildContext() throws Exception {
     String certAlias = "1";
     String keystorePassword = "changeit";
-    JSONObject postBody = new JSONObject();
-    postBody.put("hello", "world");
 
     KeyStore identityKeyStore = KeyStore.getInstance("PKCS12", "SunJSSE");
     FileInputStream identityKeyStoreFile = new FileInputStream(new File("keystore.p12"));
@@ -59,7 +64,10 @@ public class Commands {
             })
             .loadTrustMaterial(trustKeyStore, null)
             .build();
+    return sslContext;
+  }
 
+  private CloseableHttpClient buildClient(SSLContext sslContext) {
     SSLConnectionSocketFactory sslConnectionSocketFactory = new SSLConnectionSocketFactory(sslContext,
             new String[]{"TLSv1.2", "TLSv1.1"},
             null,
@@ -68,30 +76,30 @@ public class Commands {
     CloseableHttpClient client = HttpClients.custom()
             .setSSLSocketFactory(sslConnectionSocketFactory)
             .build();
-
-    int responseCode = callEndPoint (client, API_URL, postBody);
+    return client;
   }
 
-  private static int callEndPoint (CloseableHttpClient client, String endpoint, JSONObject body) {
-    try {
-      HttpPost post = new HttpPost(endpoint);
-      post.setHeader("Accept", "application/json");
-      post.setHeader("Content-type", "application/json");
+  private int makeAPICAll(JSONObject postBody) throws Exception {
 
-      StringEntity entity = new StringEntity(body.toString());
-      post.setEntity(entity);
+    SSLContext sslContext = buildContext();
+    CloseableHttpClient client = buildClient(sslContext);
 
-      HttpResponse response = client.execute(post);
+    return doAPIPost(client, API_URL, postBody);
+  }
 
-      int responseCode = response.getStatusLine().getStatusCode();
-      log.info("Response Code: " + responseCode);
+  private static int doAPIPost(CloseableHttpClient client, String endpoint, JSONObject body) throws Exception {
+    HttpPost post = new HttpPost(endpoint);
+    post.setHeader("Accept", "application/json");
+    post.setHeader("Content-type", "application/json");
 
-      return responseCode;
-    } catch (Exception ex) {
-      System.out.println("Boom, we failed: " + ex);
-      ex.printStackTrace();
-      return 500;
-    }
+    StringEntity entity = new StringEntity(body.toString());
+    post.setEntity(entity);
 
+    HttpResponse response = client.execute(post);
+
+    int responseCode = response.getStatusLine().getStatusCode();
+    log.info("Response Code: " + responseCode);
+
+    return responseCode;
   }
 }
