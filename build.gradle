@@ -15,4 +15,6 @@ repositories {
 
 dependencies {
 	compile 'org.springframework.shell:spring-shell-starter:2.0.0.RELEASE'
+	compile 'org.apache.httpcomponents:httpclient:4.5.9'
+	compile 'org.json:json:20180813'
 }
